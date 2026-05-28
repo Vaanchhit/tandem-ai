@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  min-height: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Inter", "SF Pro Text", "SF Pro Display", "Segoe UI", sans-serif;
+  background: #0b0f14;
+  color: #f5f7fa;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+*::selection {
+  background: rgba(79, 140, 255, 0.28);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+input[type='range'] {
+  height: 0.5rem;
+}
