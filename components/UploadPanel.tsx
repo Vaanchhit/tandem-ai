@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { API_BASE, parseDocument, uploadDocument } from '../lib/api';
+import { API_BASE, parseDocument, seedDemoCompany, uploadDocument } from '../lib/api';
 import { useAppStore } from '../store/useAppStore';
 
 interface UploadPanelProps {
@@ -15,6 +15,14 @@ export function UploadPanel({ onCompanyCreated }: UploadPanelProps) {
   const { setSelectedCompanyId, setParsedPayload } = useAppStore();
   const queryClient = useQueryClient();
 
+  const syncParsedPayload = (companyId: number, payload: any, nextMessage: string) => {
+    setSelectedCompanyId(companyId);
+    onCompanyCreated(companyId);
+    setParsedPayload(payload);
+    queryClient.invalidateQueries({ queryKey: ['company', companyId] });
+    setMessage(nextMessage);
+  };
+
   const uploadMutation = useMutation({
     mutationFn: uploadDocument,
     onSuccess(data) {
@@ -24,9 +32,7 @@ export function UploadPanel({ onCompanyCreated }: UploadPanelProps) {
 
       parseDocument(data.document_id)
         .then((payload) => {
-          setParsedPayload(payload);
-          queryClient.invalidateQueries({ queryKey: ['company', data.company_id] });
-          setMessage('Parsing complete. Review the extracted numbers and continue.');
+          syncParsedPayload(data.company_id, payload, 'Parsing complete. Review the extracted numbers and continue.');
         })
         .catch(() => {
           setMessage('Upload worked, but parsing failed. Try another PDF or continue with manual review.');
@@ -85,6 +91,23 @@ export function UploadPanel({ onCompanyCreated }: UploadPanelProps) {
             }}
           >
             {isUploading ? 'Uploading...' : 'Upload and parse'}
+          </button>
+
+          <button
+            className="mt-3 inline-flex w-full items-center justify-center rounded-lg border border-border bg-panel px-4 py-3 text-[14px] font-semibold text-slate-100 transition hover:border-primary/40"
+            onClick={() => {
+              setMessage('Loading demo company...');
+              seedDemoCompany()
+                .then((data) => parseDocument(data.document_id).then((payload) => ({ data, payload })))
+                .then(({ data, payload }) => {
+                  syncParsedPayload(data.company_id, payload, 'Demo company loaded. All screens are now interactive for the client walkthrough.');
+                })
+                .catch(() => {
+                  setMessage('Unable to load demo company.');
+                });
+            }}
+          >
+            Load sample company
           </button>
 
           <div className="mt-4 rounded-lg border border-border bg-panel px-4 py-3 text-[13px] text-muted">

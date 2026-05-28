@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import * as XLSX from 'xlsx';
 import { API_BASE, type WorkbookCell, type WorkbookSheet, updateWorkbookCell } from '../lib/api';
 
 interface WorkbookPanelProps {
@@ -13,6 +14,27 @@ interface WorkbookPanelProps {
 function formatCellValue(cell: WorkbookCell) {
   if (cell.value == null) return '';
   return Number.isInteger(cell.value) ? String(cell.value) : cell.value.toFixed(2);
+}
+
+function exportWorkbookLocally(workbook: WorkbookSheet[], companyId: number) {
+  const book = XLSX.utils.book_new();
+
+  workbook.forEach((sheet) => {
+    const maxRow = Math.max(...sheet.cells.map((cell) => cell.row), 1);
+    const rows: Array<Array<string | number>> = Array.from({ length: maxRow }, () => ['', '', '']);
+
+    sheet.cells.forEach((cell) => {
+      const targetRow = rows[cell.row - 1];
+      targetRow[0] = cell.label || `R${cell.row}C${cell.col}`;
+      targetRow[1] = cell.formula || '';
+      targetRow[2] = cell.value ?? '';
+    });
+
+    const worksheet = XLSX.utils.aoa_to_sheet([['Label', 'Formula', 'Value'], ...rows]);
+    XLSX.utils.book_append_sheet(book, worksheet, sheet.name.slice(0, 31));
+  });
+
+  XLSX.writeFile(book, `valuation_${companyId}.xlsx`);
 }
 
 export function WorkbookPanel({ companyId, workbook = [], onRefresh }: WorkbookPanelProps) {
@@ -69,19 +91,24 @@ export function WorkbookPanel({ companyId, workbook = [], onRefresh }: WorkbookP
 
   const handleExport = async () => {
     if (!companyId) return;
+    try {
+      const response = await fetch(`${API_BASE}/export/${companyId}/xlsx`);
+      if (!response.ok) {
+        throw new Error('Remote export unavailable');
+      }
 
-    const response = await fetch(`${API_BASE}/export/${companyId}/xlsx`);
-    if (!response.ok) return;
-
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `valuation_${companyId}.xlsx`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `valuation_${companyId}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      exportWorkbookLocally(workbook, companyId);
+    }
   };
 
   if (!companyId || workbook.length === 0) {
